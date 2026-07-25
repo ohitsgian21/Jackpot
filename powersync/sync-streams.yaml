@@ -1,0 +1,50 @@
+# Jackpot — PowerSync Sync Streams config
+#
+# Paste this into the PowerSync Cloud dashboard under Sync Streams → Deploy
+# (PowerSync Cloud has no local file it reads directly — this file is the
+# source of truth to keep in sync with what's deployed there).
+#
+# Why this file exists: PowerSync's replication connection to Supabase does
+# NOT go through Postgres Row Level Security. RLS (see supabase/schema.sql)
+# is still the enforced boundary for writes, but what replicates to a
+# device is scoped entirely by these queries. Each stream below mirrors the
+# corresponding RLS policy's `user_id = auth.uid()` logic — review changes
+# here with the same scrutiny as an RLS policy change.
+
+config:
+  edition: 3
+
+streams:
+  accounts:
+    auto_subscribe: true
+    query: SELECT * FROM accounts WHERE user_id = auth.user_id()
+
+  credit_card_details:
+    auto_subscribe: true
+    query: |
+      SELECT ccd.* FROM credit_card_details ccd
+      INNER JOIN accounts a ON ccd.account_id = a.id
+      WHERE a.user_id = auth.user_id()
+
+  loan_details:
+    auto_subscribe: true
+    query: |
+      SELECT ld.* FROM loan_details ld
+      INNER JOIN accounts a ON ld.account_id = a.id
+      WHERE a.user_id = auth.user_id()
+
+  income_sources:
+    auto_subscribe: true
+    query: SELECT * FROM income_sources WHERE user_id = auth.user_id()
+
+  categories:
+    auto_subscribe: true
+    query: SELECT * FROM categories WHERE user_id = auth.user_id()
+
+  bills:
+    auto_subscribe: true
+    query: SELECT * FROM bills WHERE user_id = auth.user_id()
+
+  budgets:
+    auto_subscribe: true
+    query: SELECT * FROM budgets WHERE user_id = auth.user_id()
