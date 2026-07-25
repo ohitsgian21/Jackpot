@@ -22,15 +22,15 @@ streams:
   credit_card_details:
     auto_subscribe: true
     query: |
-      SELECT ccd.* FROM credit_card_details ccd
-      INNER JOIN accounts a ON ccd.account_id = a.id
+      SELECT credit_card_details.* FROM credit_card_details
+      INNER JOIN accounts a ON credit_card_details.account_id = a.id
       WHERE a.user_id = auth.user_id()
 
   loan_details:
     auto_subscribe: true
     query: |
-      SELECT ld.* FROM loan_details ld
-      INNER JOIN accounts a ON ld.account_id = a.id
+      SELECT loan_details.* FROM loan_details
+      INNER JOIN accounts a ON loan_details.account_id = a.id
       WHERE a.user_id = auth.user_id()
 
   income_sources:

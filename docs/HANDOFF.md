@@ -88,20 +88,16 @@ Also note: PowerSync's docs distinguish legacy "Sync Rules" (`bucket_definitions
 - **Windows**: `flutter build windows --debug` succeeds; ran the built `jackpot.exe` directly — Supabase initialized successfully against the real project, no crash from the secure-storage native plugin
 - **Android**: `flutter run -d emulator-5554` on the `Pixel_Jackpot_API_35` AVD — built, installed, launched, Supabase initialized successfully. (First run hit a stale Gradle daemon lock from an earlier interrupted attempt — fixed with `cd android && ./gradlew --stop`. Worth knowing if a future `flutter run` mysteriously fails with `Timeout waiting to lock build logic queue`.)
 
-## 4. What's NOT done yet (explicitly deferred or blocked on manual steps)
+## 4. Phase 0 manual steps — all completed (as of the second session)
 
-**Manual steps only you can do** (not automatable — need browser/dashboard access):
-1. Run the PowerSync replication role + publication SQL in Supabase's SQL Editor:
-   ```sql
-   CREATE ROLE powersync_role WITH REPLICATION BYPASSRLS LOGIN PASSWORD 'pick-a-strong-random-password';
-   GRANT SELECT ON ALL TABLES IN SCHEMA public TO powersync_role;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO powersync_role;
-   CREATE PUBLICATION powersync FOR ALL TABLES;
-   ```
-2. Connect PowerSync to Supabase: dashboard → Connect to Source Database → Postgres → paste Supabase's **direct connection** string (not the pooler) → set username to `powersync_role` and the password from step 1 → SSL mode `verify-full` (no certificate upload needed, Supabase's CA is trusted by default) → Test → Save.
-3. Paste `powersync/sync-streams.yaml` into the PowerSync dashboard's Sync Streams section and deploy.
-4. Create two test users in Supabase Auth and manually confirm querying as one never returns the other's rows (the RLS check `ROADMAP.md` Phase 0 calls for) — this checks the write-side boundary; deploying and reviewing sync-streams.yaml checks the read-side boundary. Both need to happen.
-5. Try an actual signup in the running app. Supabase requires email confirmation by default — confirm this flow behaves sensibly (the signup screen already shows "Check your email to confirm your account" when `session == null` after signup, but hasn't been tested against a real inbox yet).
+All five items below (originally listed as pending) are now done and verified:
+
+1. **PowerSync replication role** — `powersync_role` created in Supabase (`REPLICATION BYPASSRLS LOGIN`, `SELECT` on all tables + default privileges, `powersync` publication `FOR ALL TABLES`). Note: the role already existed in a not-fully-known state when this was run the second time, so the password was reset via `ALTER ROLE` rather than assuming `CREATE ROLE` — worth knowing if you ever need to rotate it again.
+2. **PowerSync connected to Supabase** — using the direct connection (`db.nooxqddqqwsbaetcrzhc.supabase.co:5432`, not the pooler), authenticating as `powersync_role` (not the `postgres` superuser it was initially/accidentally configured with — switched to the scoped role for least privilege), SSL mode `verify-full`.
+3. **Sync Streams deployed.** The `credit_card_details` and `loan_details` queries originally used a table alias (`ccd`, `ld`) in the `SELECT` clause, which PowerSync flagged as a bug: `SELECT alias.*` syncs the local table under the alias name, not the real table name, so the app's queries against `credit_card_details`/`loan_details` would have silently returned zero rows. Fixed by dropping the alias on the source table (kept only on the joined `accounts` table) — see `powersync/sync-streams.yaml`. **If you add a new stream with a join, watch for this same trap.**
+4. **RLS verified** — two test users (`test1@jackpot.test`, `test2@jackpot.test`) created in Supabase Auth; impersonated each via `set local role authenticated; set local request.jwt.claims = '{"sub": "<uuid>", "role": "authenticated"}'` in the SQL Editor (the SQL Editor otherwise runs as the `postgres` superuser, which bypasses RLS entirely). Each user's `select * from categories` returned only their own row. Test rows deleted after; the two test users were left in place.
+5. **Real signup/email-confirmation flow tested** — works end-to-end. One gotcha hit along the way: the first confirmation-link click returned `otp_expired`/`access_denied` even though the account genuinely got confirmed (verified via the Auth dashboard's confirmed-at timestamp) — almost certainly the email client/browser prefetching and consuming the single-use token before the real click. Not a bug in the app or Supabase config, just a heads-up if it happens again.
+   - Also fixed while here: the Auth project's **Site URL** was still the Supabase-generated placeholder `localhost:3000`, so a successful confirmation would have redirected to a dead page anyway. Replaced with a minimal static "you're confirmed, return to the app" page hosted at `https://ohitsgian21.github.io/Jackpot/` (separate public GitHub repo, `Jackpot`, containing only a single `index.html` — no app code or secrets). Supabase Auth → URL Configuration → Site URL now points there.
 
 **Explicitly out of scope for Phase 0** (per decisions made this session, revisit when relevant):
 - Sprint 1+ (accounts CRUD, income/bills, dashboard, calendar, budgets — see `docs/ROADMAP.md`)
