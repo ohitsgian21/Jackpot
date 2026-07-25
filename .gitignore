@@ -47,5 +47,7 @@ app.*.map.json
 # Jackpot-specific
 .claude/settings.local.json
 *.env.json
+env.json
 .env
 secrets.dart
+supabaseAPI.txt
